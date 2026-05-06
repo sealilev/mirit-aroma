@@ -542,16 +542,8 @@
       el.innerHTML = '<div class="empty-state">אין עדכונים עדיין</div>';
       return;
     }
-    el.innerHTML = items.map(p => `
-      <div class="prog-row" style="${!p.read_at ? 'border-color:rgba(200,132,60,0.45);' : ''}">
-        <div class="prog-feeling">${p.feeling ? feelingEmoji(p.feeling) : '•'}</div>
-        <div style="flex:1">
-          <div class="prog-text">${p.update_text}${!p.read_at ? ' <span style="font-size:0.7rem;color:var(--amber);font-weight:600;letter-spacing:0.1em">חדש</span>' : ''}</div>
-          <div class="prog-meta">${p.oils ? p.oils.name + ' · ' : ''}${formatDate(p.created_at)}</div>
-        </div>
-      </div>
-    `).join('');
-    // סמן את כולם כנקראו
+
+    // סמן כנקרא — לפני הרינדור כדי שה-badge יתעדכן
     const unread = items.filter(p => !p.read_at);
     if (unread.length) {
       const now = new Date().toISOString();
@@ -562,11 +554,20 @@
           body: JSON.stringify({ read_at: now })
         })
       ));
-      // רענן רשימת לקוחות כדי להסיר badge
-      await loadClients();
-      // שחזר active
-      document.getElementById(`ci-${clientId}`)?.classList.add('active');
+      // עדכן badge בצד של הרשימה בלי לטעון מחדש
+      const badge = document.querySelector(`#ci-${clientId} .unread-badge`);
+      if (badge) badge.remove();
     }
+
+    el.innerHTML = items.map(p => `
+      <div class="prog-row" style="${!p.read_at ? 'border-color:rgba(200,132,60,0.45);' : ''}">
+        <div class="prog-feeling">${p.feeling ? feelingEmoji(p.feeling) : '•'}</div>
+        <div style="flex:1">
+          <div class="prog-text">${p.update_text}${!p.read_at ? ' <span style="font-size:0.7rem;color:var(--amber);font-weight:600;letter-spacing:0.1em">חדש</span>' : ''}</div>
+          <div class="prog-meta">${p.oils ? p.oils.name + ' · ' : ''}${formatDate(p.created_at)}</div>
+        </div>
+      </div>
+    `).join('');
   }
 
   function switchTab(tab) {
