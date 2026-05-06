@@ -566,8 +566,9 @@
         })
       ));
       // הסר badge מהרשימה
-      const badge = document.querySelector(`#ci-${clientId} .unread-badge`);
-      if (badge) badge.remove();
+      document.querySelectorAll('.unread-badge').forEach(b => {
+        if (b.closest('.client-item.active')) b.remove();
+      });
     }
   }
 
