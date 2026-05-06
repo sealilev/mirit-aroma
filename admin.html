@@ -542,33 +542,43 @@
       el.innerHTML = '<div class="empty-state">אין עדכונים עדיין</div>';
       return;
     }
+    el.innerHTML = items.map(p => {
+      const isNew = !p.read_at;
+      return '<div class="prog-row" id="prog-' + p.id + '"'
+        + (isNew ? ' onclick="markRead(\'' + p.id + '\')"' : '')
+        + ' style="' + (isNew ? 'border-color:rgba(200,132,60,0.45);cursor:pointer;' : '') + '">'
+        + '<div class="prog-feeling">' + (p.feeling ? feelingEmoji(p.feeling) : '•') + '</div>'
+        + '<div style="flex:1">'
+        + '<div class="prog-text">' + p.update_text
+        + (isNew ? ' <span id="new-' + p.id + '" style="font-size:0.7rem;color:var(--amber);font-weight:600"> חדש ✓</span>' : '')
+        + '</div>'
+        + '<div class="prog-meta">' + (p.oils ? p.oils.name + ' · ' : '') + formatDate(p.created_at) + '</div>'
+        + '</div></div>';
+    }).join('');
+  }
 
-    // רנדר את העדכונים
-    el.innerHTML = items.map(p => `
-      <div class="prog-row" style="${!p.read_at ? 'border-color:rgba(200,132,60,0.45);' : ''}">
-        <div class="prog-feeling">${p.feeling ? feelingEmoji(p.feeling) : '•'}</div>
-        <div style="flex:1">
-          <div class="prog-text">${p.update_text}${!p.read_at ? ' <span style="font-size:0.7rem;color:var(--amber);font-weight:600;letter-spacing:0.1em">חדש</span>' : ''}</div>
-          <div class="prog-meta">${p.oils ? p.oils.name + ' · ' : ''}${formatDate(p.created_at)}</div>
-        </div>
-      </div>
-    `).join('');
-
-    // סמן כנקרא אחרי הרינדור
-    const unread = items.filter(p => !p.read_at);
-    if (unread.length) {
-      const now = new Date().toISOString();
-      await Promise.all(unread.map(p =>
-        api(`progress_updates?id=eq.${p.id}`, {
-          method: 'PATCH',
-          headers: { 'Prefer': 'return=minimal', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-          body: JSON.stringify({ read_at: now })
-        })
-      ));
-      // הסר badge מהרשימה
-      document.querySelectorAll('.unread-badge').forEach(b => {
-        if (b.closest('.client-item.active')) b.remove();
-      });
+  async function markRead(progressId) {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/progress_updates?id=eq.' + progressId, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ read_at: new Date().toISOString() })
+    });
+    if (res.ok) {
+      const row = document.getElementById('prog-' + progressId);
+      if (row) { row.style.borderColor = ''; row.style.cursor = ''; row.removeAttribute('onclick'); }
+      const span = document.getElementById('new-' + progressId);
+      if (span) span.remove();
+      const badge = document.querySelector('.client-item.active .unread-badge');
+      if (badge) {
+        const count = parseInt(badge.textContent) - 1;
+        if (count <= 0) badge.remove();
+        else badge.textContent = count;
+      }
     }
   }
 
