@@ -133,6 +133,17 @@
     }
     .client-item-name { font-size: 0.96rem; color: var(--text); margin-bottom: 2px; }
     .client-item-email { font-size: 0.76rem; color: var(--text-dim); }
+    .unread-badge {
+      display: inline-block;
+      background: var(--amber);
+      color: #3B1F08;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
 
     .btn-add {
       width: 100%;
@@ -434,13 +445,22 @@
 
   async function loadClients() {
     const clients = await api('clients?select=*&order=created_at.asc');
+    const unreadCounts = {};
+    await Promise.all(clients.map(async c => {
+      const unread = await api(`progress_updates?client_id=eq.${c.id}&read_at=is.null&select=id`);
+      unreadCounts[c.id] = unread.length;
+    }));
     const list = document.getElementById('client-list');
-    list.innerHTML = clients.map(c => `
-      <div class="client-item" onclick="selectClient('${c.id}','${c.name}','${c.token}')" id="ci-${c.id}">
-        <div class="client-item-name">${c.name}</div>
-        <div class="client-item-email">${c.email}</div>
-      </div>
-    `).join('');
+    list.innerHTML = clients.map(c => {
+      const count = unreadCounts[c.id] || 0;
+      const badge = count > 0 ? `<span class="unread-badge">${count}</span>` : '';
+      return `
+        <div class="client-item" onclick="selectClient('${c.id}','${c.name}','${c.token}')" id="ci-${c.id}">
+          <div class="client-item-name">${c.name} ${badge}</div>
+          <div class="client-item-email">${c.email}</div>
+        </div>
+      `;
+    }).join('');
   }
 
   async function selectClient(id, name, token) {
@@ -517,17 +537,35 @@
   async function loadProgress(clientId) {
     const items = await api(`progress_updates?client_id=eq.${clientId}&select=*,oils(name)&order=created_at.desc`);
     const el = document.getElementById('tab-progress');
-    el.innerHTML = items.length
-      ? items.map(p => `
-          <div class="prog-row">
-            <div class="prog-feeling">${p.feeling ? feelingEmoji(p.feeling) : '•'}</div>
-            <div>
-              <div class="prog-text">${p.update_text}</div>
-              <div class="prog-meta">${p.oils ? p.oils.name + ' · ' : ''}${formatDate(p.created_at)}</div>
-            </div>
-          </div>
-        `).join('')
-      : '<div class="empty-state">אין עדכונים עדיין</div>';
+    if (!items.length) {
+      el.innerHTML = '<div class="empty-state">אין עדכונים עדיין</div>';
+      return;
+    }
+    el.innerHTML = items.map(p => `
+      <div class="prog-row" style="${!p.read_at ? 'border-color:rgba(200,132,60,0.45);' : ''}">
+        <div class="prog-feeling">${p.feeling ? feelingEmoji(p.feeling) : '•'}</div>
+        <div style="flex:1">
+          <div class="prog-text">${p.update_text}${!p.read_at ? ' <span style="font-size:0.7rem;color:var(--amber);font-weight:600;letter-spacing:0.1em">חדש</span>' : ''}</div>
+          <div class="prog-meta">${p.oils ? p.oils.name + ' · ' : ''}${formatDate(p.created_at)}</div>
+        </div>
+      </div>
+    `).join('');
+    // סמן את כולם כנקראו
+    const unread = items.filter(p => !p.read_at);
+    if (unread.length) {
+      const now = new Date().toISOString();
+      await Promise.all(unread.map(p =>
+        api(`progress_updates?id=eq.${p.id}`, {
+          method: 'PATCH',
+          headers: { 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ read_at: now })
+        })
+      ));
+      // רענן רשימת לקוחות כדי להסיר badge
+      await loadClients();
+      // שחזר active
+      document.getElementById(`ci-${clientId}`)?.classList.add('active');
+    }
   }
 
   function switchTab(tab) {
