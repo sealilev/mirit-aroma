@@ -473,11 +473,12 @@
     const panel = document.getElementById('main-panel');
     panel.innerHTML = `
       <div class="panel-header">
-        <div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <button onclick="clearPanel()" style="background:transparent;border:1px solid rgba(232,217,192,0.2);border-radius:4px;padding:6px 12px;color:var(--text-dim);font-family:Assistant,sans-serif;font-size:0.8rem;cursor:pointer;transition:border-color 0.2s" onmouseover="this.style.borderColor='rgba(232,217,192,0.5)'" onmouseout="this.style.borderColor='rgba(232,217,192,0.2)'">← רשימה</button>
           <div class="panel-client-name">${name}</div>
         </div>
         <div class="link-box" onclick="copyLink('${clientLink}')">
-          📋 העתיקי קישור ללקוחה
+          📋 העתיקי קישור ללקוח/ת
         </div>
       </div>
       <div class="tabs">
@@ -575,6 +576,9 @@
     });
     document.getElementById('tab-oils').classList.toggle('active', tab==='oils');
     document.getElementById('tab-progress').classList.toggle('active', tab==='progress');
+    if (tab === 'progress' && currentClientId) {
+      loadProgress(currentClientId);
+    }
   }
 
   async function saveOil() {
@@ -607,6 +611,17 @@
     });
     closeAddClient();
     await loadClients();
+  }
+
+  function clearPanel() {
+    currentClientId = null;
+    document.querySelectorAll('.client-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('main-panel').innerHTML = `
+      <div class="no-selection">
+        <p>בחרי לקוח/ת מהרשימה</p>
+        <small>כדי לראות את הפרטים, השמנים והעדכונים שלה</small>
+      </div>
+    `;
   }
 
   function copyLink(link) {
